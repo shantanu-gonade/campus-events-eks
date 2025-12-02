@@ -21,6 +21,9 @@ module "eks" {
   cluster_endpoint_public_access  = true
   cluster_endpoint_private_access = true
 
+  # Enable cluster creator admin permissions
+  enable_cluster_creator_admin_permissions = true
+
   # Cluster addons
   cluster_addons = {
     coredns = {
