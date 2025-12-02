@@ -1,0 +1,22 @@
+configure_kubectl = "aws eks update-kubeconfig --region us-east-1 --name campus-events-dev"
+eks_cluster_certificate_authority_data = <sensitive>
+eks_cluster_endpoint = "https://3596478A41B9CA4A334B8FCD02FECAFD.gr7.us-east-1.eks.amazonaws.com"
+eks_cluster_oidc_issuer_url = "https://oidc.eks.us-east-1.amazonaws.com/id/3596478A41B9CA4A334B8FCD02FECAFD"
+eks_cluster_security_group_id = "sg-06a415ea0262b4edc"
+eks_oidc_provider_arn = "arn:aws:iam::842819994894:oidc-provider/oidc.eks.us-east-1.amazonaws.com/id/3596478A41B9CA4A334B8FCD02FECAFD"
+private_subnet_ids = [
+  "subnet-010d2b40b88691652",
+  "subnet-0b7d2824672e5a3d7",
+  "subnet-00dc8e2c284629e40",
+]
+public_subnet_ids = [
+  "subnet-06a74b0b9f1ff477c",
+  "subnet-09dfa3328a0ae0bed",
+  "subnet-014afcbd951531452",
+]
+rds_address = "campus-events-dev-db.ckxuk4eosxj9.us-east-1.rds.amazonaws.com"
+rds_database_name = "campusevents"
+rds_endpoint = "campus-events-dev-db.ckxuk4eosxj9.us-east-1.rds.amazonaws.com:5432"
+rds_port = 5432
+rds_security_group_id = "sg-0c1582a585be5b072"
+vpc_id = "vpc-03bedf1b108aae6bf"

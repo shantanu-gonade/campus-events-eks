@@ -1,0 +1,7 @@
+# AWS Configuration
+region = "us-east-1"
+
+# RDS Configuration
+# IMPORTANT: Change this password before deploying!
+# In production, use AWS Secrets Manager or environment variables
+db_password = "password"
