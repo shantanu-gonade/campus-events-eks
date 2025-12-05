@@ -77,3 +77,19 @@ output "configure_kubectl" {
   description = "Configure kubectl command"
   value       = "aws eks update-kubeconfig --region ${var.region} --name ${local.cluster_name}"
 }
+
+# GitHub OIDC Outputs
+output "github_actions_role_arn" {
+  description = "ARN of the IAM role for GitHub Actions"
+  value       = module.github_oidc.role_arn
+}
+
+output "github_actions_role_name" {
+  description = "Name of the IAM role for GitHub Actions"
+  value       = module.github_oidc.role_name
+}
+
+output "github_oidc_provider_arn" {
+  description = "ARN of the GitHub OIDC provider"
+  value       = module.github_oidc.oidc_provider_arn
+}
