@@ -16,7 +16,7 @@ function App() {
   const fetchEvents = async () => {
     try {
       setLoading(true)
-      const response = await axios.get(`${API_URL}/api/events`)
+      const response = await axios.get(`${API_URL}/api/v1/events`)
       setEvents(response.data)
       setError(null)
     } catch (err) {
