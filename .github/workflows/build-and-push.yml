@@ -10,9 +10,11 @@ env:
   AWS_REGION: us-east-1
   ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com
 
+# Updated permissions to include security-events
 permissions:
-  id-token: write   # Required for OIDC
-  contents: read
+  id-token: write           # Required for OIDC
+  contents: read            # Required for checkout
+  security-events: write    # Required for uploading SARIF files
 
 jobs:
   build-and-push:
@@ -68,10 +70,11 @@ jobs:
           exit-code: '0'  # Don't fail on vulnerabilities for now
 
       - name: Upload Trivy results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         if: always()
         with:
           sarif_file: 'trivy-results-${{ matrix.service.name }}.sarif'
+          category: ${{ matrix.service.name }}-security-scan
 
       - name: Push Docker image to ECR
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
