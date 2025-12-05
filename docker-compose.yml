@@ -1,0 +1,110 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: campus-events-db
+    environment:
+      POSTGRES_DB: campus_events
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docs/DATABASE_SCHEMA.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - campus-events
+
+  # Events API
+  events-api:
+    build:
+      context: ./applications/events-api
+      dockerfile: Dockerfile
+    container_name: events-api
+    environment:
+      PORT: 8080
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: campus_events
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      LOG_LEVEL: info
+      CORS_ORIGIN: "*"
+      NODE_ENV: development
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - campus-events
+    restart: unless-stopped
+
+  # Notification Service
+  notification-service:
+    build:
+      context: ./applications/notification-service
+      dockerfile: Dockerfile
+    container_name: notification-service
+    environment:
+      PORT: 8082
+      AWS_REGION: us-east-1
+      LOG_LEVEL: info
+      # AWS Credentials - Add your actual AWS credentials here
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      # Replace with your actual verified SES email
+      SES_SENDER_EMAIL: ${SES_SENDER_EMAIL:-shangonade@gmail.com}
+      # Replace with your actual SNS topic ARN
+      SNS_TOPIC_ARN: ${SNS_TOPIC_ARN:-arn:aws:sns:us-east-1:123456789012:campus-events-notifications}
+    ports:
+      - "8082:8082"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8082/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - campus-events
+    restart: unless-stopped
+
+  # Frontend
+  frontend:
+    build:
+      context: ./applications/frontend
+      dockerfile: Dockerfile
+    container_name: frontend
+    environment:
+      VITE_API_URL: http://localhost:8080/api/v1
+    ports:
+      - "3000:3000"
+    depends_on:
+      - events-api
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - campus-events
+    restart: unless-stopped
+
+networks:
+  campus-events:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local

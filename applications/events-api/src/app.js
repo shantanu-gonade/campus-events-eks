@@ -1,0 +1,72 @@
+import express from 'express'
+import helmet from 'helmet'
+import cors from 'cors'
+import morgan from 'morgan'
+import rateLimit from 'express-rate-limit'
+import dotenv from 'dotenv'
+import eventRoutes from './routes/events.js'
+import { errorHandler } from './middleware/errorHandler.js'
+import logger from './utils/logger.js'
+
+dotenv.config()
+
+const app = express()
+const PORT = process.env.PORT || 8080
+
+// Security middleware
+app.use(helmet())
+app.use(cors({
+  origin: process.env.CORS_ORIGIN || '*',
+  credentials: true
+}))
+
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100 // limit each IP to 100 requests per windowMs
+})
+app.use('/api/', limiter)
+
+// Logging
+app.use(morgan('combined'))
+
+// Body parsing
+app.use(express.json({ limit: '10mb' }))
+app.use(express.urlencoded({ extended: true, limit: '10mb' }))
+
+// Health check
+app.get('/health', (req, res) => {
+  res.json({ status: 'healthy', timestamp: new Date().toISOString() })
+})
+
+app.get('/ready', async (req, res) => {
+  try {
+    const { default: pool } = await import('./config/database.js')
+    await pool.query('SELECT 1')
+    res.json({ status: 'ready', timestamp: new Date().toISOString() })
+  } catch (error) {
+    res.status(503).json({ status: 'not ready', error: error.message })
+  }
+})
+
+// Routes
+app.use('/api/v1/events', eventRoutes)
+
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({ error: 'Not found' })
+})
+
+// Error handler
+app.use(errorHandler)
+
+// Start server
+app.listen(PORT, '0.0.0.0', () => {
+  logger.info(`Events API listening on port ${PORT}`)
+})
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  logger.info('SIGTERM received, shutting down gracefully')
+  process.exit(0)
+})
