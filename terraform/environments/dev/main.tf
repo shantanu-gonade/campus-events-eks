@@ -35,6 +35,9 @@ locals {
   cluster_name = "campus-events-dev"
 }
 
+# Data source for AWS account ID
+data "aws_caller_identity" "current" {}
+
 # VPC Module
 module "vpc" {
   source = "../../modules/vpc"
@@ -103,6 +106,26 @@ module "rds" {
   performance_insights_retention_period = 7
 
   environment = "dev"
+
+  tags = {
+    Project = "campus-events"
+  }
+}
+
+# GitHub OIDC Module for GitHub Actions
+module "github_oidc" {
+  source = "../../modules/github-oidc"
+
+  github_org  = var.github_org
+  github_repo = var.github_repo
+  role_name   = "GitHubActionsRole"
+
+  # ECR repository ARNs - update after ECR repos are created
+  ecr_repository_arns = [
+    "arn:aws:ecr:${var.region}:${data.aws_caller_identity.current.account_id}:repository/campus-events/frontend",
+    "arn:aws:ecr:${var.region}:${data.aws_caller_identity.current.account_id}:repository/campus-events/events-api",
+    "arn:aws:ecr:${var.region}:${data.aws_caller_identity.current.account_id}:repository/campus-events/notification-service"
+  ]
 
   tags = {
     Project = "campus-events"
