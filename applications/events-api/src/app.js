@@ -13,6 +13,9 @@ dotenv.config()
 const app = express()
 const PORT = process.env.PORT || 8080
 
+// Trust proxy for ALB
+app.set('trust proxy', true)
+
 // Security middleware
 app.use(helmet())
 app.use(cors({
@@ -34,8 +37,12 @@ app.use(morgan('combined'))
 app.use(express.json({ limit: '10mb' }))
 app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 
-// Health check
+// Health check - handle both root and /api prefix
 app.get('/health', (req, res) => {
+  res.json({ status: 'healthy', timestamp: new Date().toISOString() })
+})
+
+app.get('/api/health', (req, res) => {
   res.json({ status: 'healthy', timestamp: new Date().toISOString() })
 })
 
@@ -49,7 +56,18 @@ app.get('/ready', async (req, res) => {
   }
 })
 
-// Routes
+app.get('/api/ready', async (req, res) => {
+  try {
+    const { default: pool } = await import('./config/database.js')
+    await pool.query('SELECT 1')
+    res.json({ status: 'ready', timestamp: new Date().toISOString() })
+  } catch (error) {
+    res.status(503).json({ status: 'not ready', error: error.message })
+  }
+})
+
+// Routes - handle both with and without /api prefix
+app.use('/v1/events', eventRoutes)
 app.use('/api/v1/events', eventRoutes)
 
 // 404 handler
