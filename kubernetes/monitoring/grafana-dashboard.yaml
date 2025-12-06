@@ -1,0 +1,199 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: campus-events-dashboard
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+    app: kube-prometheus-stack
+    release: kube-prom-stack
+data:
+  campus-events-dashboard.json: |
+    {
+      "dashboard": {
+        "title": "Campus Events Application Dashboard",
+        "tags": ["campus-events", "microservices"],
+        "timezone": "browser",
+        "schemaVersion": 16,
+        "version": 1,
+        "refresh": "30s",
+        "time": {
+          "from": "now-1h",
+          "to": "now"
+        },
+        "panels": [
+          {
+            "id": 1,
+            "title": "Request Rate by Service",
+            "type": "graph",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+            "targets": [
+              {
+                "expr": "sum(rate(http_requests_total{namespace=\"campus-events\"}[5m])) by (app)",
+                "legendFormat": "{{ app }}",
+                "refId": "A"
+              }
+            ],
+            "yaxes": [
+              {"format": "reqps", "label": "Requests/sec"},
+              {"format": "short"}
+            ]
+          },
+          {
+            "id": 2,
+            "title": "Error Rate by Service",
+            "type": "graph",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+            "targets": [
+              {
+                "expr": "sum(rate(http_requests_total{namespace=\"campus-events\",status_code=~\"5..\"}[5m])) by (app)",
+                "legendFormat": "{{ app }} - 5xx",
+                "refId": "A"
+              },
+              {
+                "expr": "sum(rate(http_requests_total{namespace=\"campus-events\",status_code=~\"4..\"}[5m])) by (app)",
+                "legendFormat": "{{ app }} - 4xx",
+                "refId": "B"
+              }
+            ],
+            "yaxes": [
+              {"format": "reqps", "label": "Errors/sec"},
+              {"format": "short"}
+            ]
+          },
+          {
+            "id": 3,
+            "title": "Response Time (p95)",
+            "type": "graph",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+            "targets": [
+              {
+                "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{namespace=\"campus-events\"}[5m])) by (le, app))",
+                "legendFormat": "{{ app }} - p95",
+                "refId": "A"
+              },
+              {
+                "expr": "histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket{namespace=\"campus-events\"}[5m])) by (le, app))",
+                "legendFormat": "{{ app }} - p50",
+                "refId": "B"
+              }
+            ],
+            "yaxes": [
+              {"format": "s", "label": "Response Time"},
+              {"format": "short"}
+            ]
+          },
+          {
+            "id": 4,
+            "title": "Pod Count by Service",
+            "type": "graph",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+            "targets": [
+              {
+                "expr": "count(kube_pod_info{namespace=\"campus-events\"}) by (pod)",
+                "legendFormat": "{{ pod }}",
+                "refId": "A"
+              }
+            ],
+            "yaxes": [
+              {"format": "short", "label": "Pod Count"},
+              {"format": "short"}
+            ]
+          },
+          {
+            "id": 5,
+            "title": "CPU Usage by Pod",
+            "type": "graph",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+            "targets": [
+              {
+                "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"campus-events\",container!=\"\"}[5m])) by (pod)",
+                "legendFormat": "{{ pod }}",
+                "refId": "A"
+              }
+            ],
+            "yaxes": [
+              {"format": "percentunit", "label": "CPU Usage"},
+              {"format": "short"}
+            ]
+          },
+          {
+            "id": 6,
+            "title": "Memory Usage by Pod",
+            "type": "graph",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+            "targets": [
+              {
+                "expr": "sum(container_memory_working_set_bytes{namespace=\"campus-events\",container!=\"\"}) by (pod)",
+                "legendFormat": "{{ pod }}",
+                "refId": "A"
+              }
+            ],
+            "yaxes": [
+              {"format": "bytes", "label": "Memory"},
+              {"format": "short"}
+            ]
+          },
+          {
+            "id": 7,
+            "title": "Active Events (Example Metric)",
+            "type": "singlestat",
+            "gridPos": {"h": 4, "w": 6, "x": 0, "y": 24},
+            "targets": [
+              {
+                "expr": "sum(events_total{namespace=\"campus-events\"})",
+                "refId": "A"
+              }
+            ],
+            "format": "short",
+            "valueName": "current"
+          },
+          {
+            "id": 8,
+            "title": "Total RSVP Count",
+            "type": "singlestat",
+            "gridPos": {"h": 4, "w": 6, "x": 6, "y": 24},
+            "targets": [
+              {
+                "expr": "sum(rsvp_total{namespace=\"campus-events\"})",
+                "refId": "A"
+              }
+            ],
+            "format": "short",
+            "valueName": "current"
+          },
+          {
+            "id": 9,
+            "title": "Notifications Sent",
+            "type": "singlestat",
+            "gridPos": {"h": 4, "w": 6, "x": 12, "y": 24},
+            "targets": [
+              {
+                "expr": "sum(notifications_sent_total{namespace=\"campus-events\"})",
+                "refId": "A"
+              }
+            ],
+            "format": "short",
+            "valueName": "current"
+          },
+          {
+            "id": 10,
+            "title": "Database Query Duration",
+            "type": "graph",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 28},
+            "targets": [
+              {
+                "expr": "histogram_quantile(0.95, sum(rate(database_query_duration_seconds_bucket{namespace=\"campus-events\"}[5m])) by (le, operation))",
+                "legendFormat": "{{ operation }} - p95",
+                "refId": "A"
+              }
+            ],
+            "yaxes": [
+              {"format": "s", "label": "Query Duration"},
+              {"format": "short"}
+            ]
+          }
+        ]
+      }
+    }
