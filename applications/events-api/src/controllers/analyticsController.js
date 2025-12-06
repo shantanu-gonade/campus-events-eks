@@ -1,148 +1,303 @@
 // Analytics Controller
 import pool from '../config/database.js'
-import logger from '../config/logger.js'
+import logger from '../utils/logger.js'
 
-// Get Event Statistics
+// Get overall event statistics
 export const getEventStatistics = async (req, res, next) => {
   try {
-    // Get total events
-    const totalEvents = await pool.query('SELECT COUNT(*) FROM events')
-    
-    // Get upcoming events
-    const upcomingEvents = await pool.query(
-      'SELECT COUNT(*) FROM events WHERE start_time > NOW()'
+    // Total events
+    const totalEventsResult = await pool.query(
+      `SELECT COUNT(*) as total FROM events WHERE status != 'cancelled'`
     )
     
-    // Get past events
-    const pastEvents = await pool.query(
-      'SELECT COUNT(*) FROM events WHERE end_time < NOW()'
+    // Upcoming events
+    const upcomingEventsResult = await pool.query(
+      `SELECT COUNT(*) as total FROM events WHERE start_time > NOW() AND status = 'upcoming'`
     )
     
-    // Get total RSVPs
-    const totalRsvps = await pool.query('SELECT COUNT(*) FROM rsvps')
+    // Past events
+    const pastEventsResult = await pool.query(
+      `SELECT COUNT(*) as total FROM events WHERE end_time < NOW() AND status != 'cancelled'`
+    )
     
-    // Get average attendance rate
-    const attendanceRate = await pool.query(`
-      SELECT AVG((current_attendees::float / max_attendees::float) * 100) as avg_rate
-      FROM events
-      WHERE max_attendees > 0
+    // Total RSVPs
+    const totalRSVPsResult = await pool.query(
+      `SELECT COUNT(*) as total FROM rsvps WHERE status = 'confirmed'`
+    )
+    
+    // Average attendance rate
+    const avgAttendanceResult = await pool.query(`
+      SELECT 
+        ROUND(AVG((current_attendees::numeric / NULLIF(max_attendees::numeric, 1)) * 100), 2) as avg_rate
+      FROM events 
+      WHERE end_time < NOW() AND status != 'cancelled'
     `)
     
-    // Get active events (currently ongoing)
-    const activeEvents = await pool.query(
-      'SELECT COUNT(*) FROM events WHERE start_time <= NOW() AND end_time >= NOW()'
+    // Unique users who have RSVPed
+    const uniqueUsersResult = await pool.query(
+      `SELECT COUNT(DISTINCT user_id) as total FROM rsvps WHERE status = 'confirmed'`
     )
-
+    
+    // Events by status
+    const statusBreakdownResult = await pool.query(`
+      SELECT status, COUNT(*) as count
+      FROM events
+      WHERE status != 'cancelled'
+      GROUP BY status
+    `)
+    
     const statistics = {
-      total_events: parseInt(totalEvents.rows[0].count),
-      upcoming_events: parseInt(upcomingEvents.rows[0].count),
-      past_events: parseInt(pastEvents.rows[0].count),
-      total_rsvps: parseInt(totalRsvps.rows[0].count),
-      average_attendance_rate: parseFloat(attendanceRate.rows[0].avg_rate || 0).toFixed(1),
-      active_events: parseInt(activeEvents.rows[0].count),
+      total_events: parseInt(totalEventsResult.rows[0].total),
+      upcoming_events: parseInt(upcomingEventsResult.rows[0].total),
+      past_events: parseInt(pastEventsResult.rows[0].total),
+      total_rsvps: parseInt(totalRSVPsResult.rows[0].total),
+      average_attendance_rate: parseFloat(avgAttendanceResult.rows[0].avg_rate) || 0,
+      unique_attendees: parseInt(uniqueUsersResult.rows[0].total),
+      status_breakdown: statusBreakdownResult.rows
     }
-
+    
     logger.info('Event statistics retrieved')
     res.json(statistics)
   } catch (error) {
+    logger.error('Error fetching event statistics:', error)
     next(error)
   }
 }
 
-// Get Category Distribution
+// Get category distribution
 export const getCategoryDistribution = async (req, res, next) => {
   try {
     const result = await pool.query(`
       SELECT 
         category,
         COUNT(*) as count,
-        ROUND(CAST((COUNT(*)::float / NULLIF((SELECT COUNT(*) FROM events)::float, 0)) * 100 AS numeric), 1) as percentage
+        ROUND((COUNT(*)::numeric / (SELECT COUNT(*) FROM events WHERE status != 'cancelled')::numeric) * 100, 2) as percentage
       FROM events
+      WHERE status != 'cancelled'
       GROUP BY category
       ORDER BY count DESC
     `)
-
+    
     logger.info('Category distribution retrieved')
     res.json(result.rows)
   } catch (error) {
+    logger.error('Error fetching category distribution:', error)
     next(error)
   }
 }
 
-// Get Events Trend (time series)
+// Get events trend over time
 export const getEventsTrend = async (req, res, next) => {
   try {
     const { months = 6 } = req.query
-
+    
     const result = await pool.query(`
-      WITH monthly_events AS (
-        SELECT 
-          DATE_TRUNC('month', created_at) as month_date,
-          COUNT(*) as event_count
-        FROM events
-        WHERE created_at >= NOW() - INTERVAL '${parseInt(months)} months'
-        GROUP BY DATE_TRUNC('month', created_at)
-      ),
-      monthly_rsvps AS (
-        SELECT 
-          DATE_TRUNC('month', created_at) as month_date,
-          COUNT(*) as rsvp_count
-        FROM rsvps
-        WHERE created_at >= NOW() - INTERVAL '${parseInt(months)} months'
-        GROUP BY DATE_TRUNC('month', created_at)
-      )
       SELECT 
-        TO_CHAR(me.month_date, 'Mon YYYY') as month,
-        TO_CHAR(me.month_date, 'YYYY-MM') as month_key,
-        COALESCE(me.event_count, 0) as event_count,
-        COALESCE(mr.rsvp_count, 0) as rsvp_count
-      FROM monthly_events me
-      LEFT JOIN monthly_rsvps mr ON me.month_date = mr.month_date
-      ORDER BY me.month_date DESC
+        TO_CHAR(DATE_TRUNC('month', created_at), 'YYYY-MM') as month,
+        TO_CHAR(DATE_TRUNC('month', created_at), 'Mon YYYY') as month_label,
+        COUNT(*) as events_created,
+        SUM((SELECT COUNT(*) FROM rsvps r WHERE r.event_id = e.id AND r.status = 'confirmed')) as total_rsvps
+      FROM events e
+      WHERE created_at >= NOW() - INTERVAL '${parseInt(months)} months'
+        AND status != 'cancelled'
+      GROUP BY DATE_TRUNC('month', created_at)
+      ORDER BY month ASC
     `)
-
-    logger.info('Events trend retrieved')
+    
+    logger.info(`Events trend for last ${months} months retrieved`)
     res.json(result.rows)
   } catch (error) {
+    logger.error('Error fetching events trend:', error)
     next(error)
   }
 }
 
-// Get Attendance Analytics
+// Get attendance analytics
 export const getAttendanceAnalytics = async (req, res, next) => {
   try {
-    const result = await pool.query(`
+    // Overall attendance metrics
+    const overallResult = await pool.query(`
       SELECT 
-        AVG((current_attendees::float / NULLIF(max_attendees::float, 0)) * 100) as average_rate,
-        MIN((current_attendees::float / NULLIF(max_attendees::float, 0)) * 100) as min_rate,
-        MAX((current_attendees::float / NULLIF(max_attendees::float, 0)) * 100) as max_rate,
         COUNT(*) as total_events,
-        SUM(CASE WHEN (current_attendees::float / NULLIF(max_attendees::float, 0)) >= 0.9 THEN 1 ELSE 0 END) as near_capacity_events
+        ROUND(AVG((current_attendees::numeric / NULLIF(max_attendees::numeric, 1)) * 100), 2) as avg_attendance_rate,
+        MAX((current_attendees::numeric / NULLIF(max_attendees::numeric, 1)) * 100) as max_attendance_rate,
+        MIN((current_attendees::numeric / NULLIF(max_attendees::numeric, 1)) * 100) as min_attendance_rate
       FROM events
-      WHERE max_attendees > 0
+      WHERE status != 'cancelled'
     `)
-
-    const topEvents = await pool.query(`
+    
+    // Attendance by category
+    const categoryResult = await pool.query(`
+      SELECT 
+        category,
+        COUNT(*) as event_count,
+        ROUND(AVG((current_attendees::numeric / NULLIF(max_attendees::numeric, 1)) * 100), 2) as avg_attendance_rate,
+        SUM(current_attendees) as total_attendees,
+        SUM(max_attendees) as total_capacity
+      FROM events
+      WHERE status != 'cancelled'
+      GROUP BY category
+      ORDER BY avg_attendance_rate DESC
+    `)
+    
+    // Most popular events
+    const popularResult = await pool.query(`
       SELECT 
         id,
         title,
+        category,
+        start_time,
+        location,
         current_attendees,
         max_attendees,
-        ROUND(CAST((current_attendees::float / NULLIF(max_attendees::float, 0)) * 100 AS numeric), 1) as attendance_rate
+        ROUND((current_attendees::numeric / NULLIF(max_attendees::numeric, 1)) * 100, 2) as attendance_rate
       FROM events
-      WHERE max_attendees > 0
-      ORDER BY attendance_rate DESC
+      WHERE status != 'cancelled'
+      ORDER BY current_attendees DESC, attendance_rate DESC
       LIMIT 10
     `)
-
+    
     const analytics = {
-      overall: result.rows[0],
-      top_events: topEvents.rows,
+      overall: overallResult.rows[0],
+      by_category: categoryResult.rows,
+      most_popular: popularResult.rows
     }
-
+    
     logger.info('Attendance analytics retrieved')
     res.json(analytics)
   } catch (error) {
+    logger.error('Error fetching attendance analytics:', error)
+    next(error)
+  }
+}
+
+// Get recent activity feed
+export const getRecentActivity = async (req, res, next) => {
+  try {
+    const { limit = 20 } = req.query
+    
+    // Combine events and RSVPs into activity feed
+    const activities = []
+    
+    // Recent events created
+    const recentEvents = await pool.query(`
+      SELECT 
+        id,
+        title,
+        category,
+        created_at,
+        'event_created' as activity_type
+      FROM events
+      WHERE status != 'cancelled'
+      ORDER BY created_at DESC
+      LIMIT $1
+    `, [parseInt(limit)])
+    
+    // Recent RSVPs
+    const recentRSVPs = await pool.query(`
+      SELECT 
+        r.id,
+        r.created_at,
+        e.title as event_title,
+        e.id as event_id,
+        u.first_name,
+        u.last_name,
+        'rsvp_created' as activity_type
+      FROM rsvps r
+      JOIN events e ON r.event_id = e.id
+      JOIN users u ON r.user_id = u.id
+      WHERE r.status = 'confirmed'
+      ORDER BY r.created_at DESC
+      LIMIT $1
+    `, [parseInt(limit)])
+    
+    // Merge and sort activities
+    const allActivities = [
+      ...recentEvents.rows.map(e => ({
+        id: e.id,
+        type: 'event_created',
+        title: `New event created: ${e.title}`,
+        category: e.category,
+        timestamp: e.created_at,
+        metadata: {
+          event_id: e.id,
+          event_title: e.title
+        }
+      })),
+      ...recentRSVPs.rows.map(r => ({
+        id: r.id,
+        type: 'rsvp_created',
+        title: `${r.first_name} ${r.last_name} registered for ${r.event_title}`,
+        timestamp: r.created_at,
+        metadata: {
+          event_id: r.event_id,
+          event_title: r.event_title,
+          user_name: `${r.first_name} ${r.last_name}`
+        }
+      }))
+    ]
+    
+    // Sort by timestamp descending
+    allActivities.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+    
+    logger.info(`Recent activity retrieved (${allActivities.length} items)`)
+    res.json(allActivities.slice(0, parseInt(limit)))
+  } catch (error) {
+    logger.error('Error fetching recent activity:', error)
+    next(error)
+  }
+}
+
+// Get event capacity status
+export const getCapacityStatus = async (req, res, next) => {
+  try {
+    const result = await pool.query(`
+      SELECT 
+        COUNT(*) FILTER (WHERE (current_attendees::numeric / NULLIF(max_attendees::numeric, 1)) >= 0.9) as nearly_full,
+        COUNT(*) FILTER (WHERE (current_attendees::numeric / NULLIF(max_attendees::numeric, 1)) >= 1.0) as full,
+        COUNT(*) FILTER (WHERE (current_attendees::numeric / NULLIF(max_attendees::numeric, 1)) < 0.5) as low_attendance,
+        COUNT(*) as total_upcoming
+      FROM events
+      WHERE start_time > NOW() AND status = 'upcoming'
+    `)
+    
+    logger.info('Capacity status retrieved')
+    res.json(result.rows[0])
+  } catch (error) {
+    logger.error('Error fetching capacity status:', error)
+    next(error)
+  }
+}
+
+// Get monthly comparison
+export const getMonthlyComparison = async (req, res, next) => {
+  try {
+    const result = await pool.query(`
+      WITH monthly_stats AS (
+        SELECT 
+          TO_CHAR(DATE_TRUNC('month', created_at), 'YYYY-MM') as month,
+          TO_CHAR(DATE_TRUNC('month', created_at), 'Mon YYYY') as month_label,
+          COUNT(*) as events_count,
+          SUM((SELECT COUNT(*) FROM rsvps r WHERE r.event_id = e.id AND r.status = 'confirmed')) as rsvps_count,
+          ROUND(AVG((current_attendees::numeric / NULLIF(max_attendees::numeric, 1)) * 100), 2) as avg_attendance
+        FROM events e
+        WHERE created_at >= NOW() - INTERVAL '6 months'
+          AND status != 'cancelled'
+        GROUP BY DATE_TRUNC('month', created_at)
+        ORDER BY month DESC
+      )
+      SELECT *,
+        LAG(events_count) OVER (ORDER BY month) as prev_events_count,
+        LAG(rsvps_count) OVER (ORDER BY month) as prev_rsvps_count
+      FROM monthly_stats
+      ORDER BY month DESC
+      LIMIT 6
+    `)
+    
+    logger.info('Monthly comparison retrieved')
+    res.json(result.rows)
+  } catch (error) {
+    logger.error('Error fetching monthly comparison:', error)
     next(error)
   }
 }
