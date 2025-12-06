@@ -1,0 +1,75 @@
+# Karpenter Helm Values for campus-events-dev cluster
+# These values configure Karpenter for the EKS cluster
+
+# Replica count for high availability (2 for production, 1 for dev)
+replicas: 1
+
+# Service Account (already created via kubectl with IRSA annotation)
+serviceAccount:
+  create: false
+  name: karpenter
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::842819994894:role/campus-events-dev-karpenter-controller
+
+# Karpenter Settings
+settings:
+  clusterName: campus-events-dev
+  clusterEndpoint: https://3596478A41B9CA4A334B8FCD02FECAFD.gr7.us-east-1.eks.amazonaws.com
+  interruptionQueue: campus-events-dev-karpenter
+  # Feature gates
+  featureGates:
+    spotToSpotConsolidation: true
+
+# Webhook configuration
+webhook:
+  enabled: true
+  port: 8443
+
+# Controller configuration
+controller:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+
+  # Node selector to ensure Karpenter runs on existing node group
+  nodeSelector:
+    eks.amazonaws.com/nodegroup: campus-events-dev-node-group
+
+  # Tolerations
+  tolerations:
+    - key: CriticalAddonsOnly
+      operator: Exists
+
+# Pod Disruption Budget
+podDisruptionBudget:
+  enabled: false  # Set to true with replicas > 1
+
+# Affinity rules (keep controller pods on stable nodes)
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: karpenter.sh/nodepool
+              operator: DoesNotExist
+            - key: eks.amazonaws.com/nodegroup
+              operator: Exists
+
+# Topology spread for high availability
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: ScheduleAnyway
+
+# Logging configuration
+logLevel: info
+logEncoding: console
+
+# Metrics
+metrics:
+  enabled: true
+  port: 8000

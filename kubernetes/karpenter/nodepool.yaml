@@ -1,0 +1,155 @@
+#============================================================================
+# Karpenter NodePool for campus-events-dev
+#============================================================================
+# Defines the provisioning constraints and limits for Karpenter nodes
+#============================================================================
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: default
+  namespace: karpenter
+spec:
+  # Template for nodes
+  template:
+    metadata:
+      labels:
+        workload-type: general
+        managed-by: karpenter
+    
+    spec:
+      # Node expiration - replace nodes after 30 days
+      expireAfter: 720h
+
+      # Node class reference
+      nodeClassRef:
+        group: karpenter.k8s.aws
+        kind: EC2NodeClass
+        name: default
+
+      # Taints (none for default pool, pods can schedule freely)
+      taints: []
+
+      # Startup taints (prevents scheduling until node is ready)
+      startupTaints:
+        - key: node.kubernetes.io/not-ready
+          effect: NoSchedule
+
+      # Requirements for instance types and capacity
+      requirements:
+        # Instance types - cost-optimized selection
+        - key: karpenter.k8s.aws/instance-category
+          operator: In
+          values: ["t3", "t3a"]
+
+        - key: karpenter.k8s.aws/instance-size
+          operator: In
+          values: ["small", "medium", "large"]
+
+        # CPU architecture
+        - key: kubernetes.io/arch
+          operator: In
+          values: ["amd64"]
+
+        # Capacity type - support both on-demand and spot
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values: ["on-demand", "spot"]
+
+        # Availability zones
+        - key: topology.kubernetes.io/zone
+          operator: In
+          values: ["us-east-1a", "us-east-1b", "us-east-1c"]
+
+  # Limits on total resources
+  limits:
+    cpu: "100"
+    memory: 200Gi
+
+  # Disruption budget and policies
+  disruption:
+    # Consolidation - automatically optimize node utilization
+    consolidationPolicy: WhenEmptyOrUnderutilized
+    consolidateAfter: 1m
+
+    # Budgets to control disruption rate
+    budgets:
+      - nodes: "10%"  # Allow disruption of 10% of nodes at a time
+        reasons:
+          - Underutilized
+          - Empty
+      - nodes: "3"
+        reasons:
+          - Drifted
+
+  # Weight for prioritization (higher = preferred)
+  weight: 10
+---
+#============================================================================
+# Karpenter NodePool for Spot Instances (Cost Optimization)
+#============================================================================
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: spot
+  namespace: karpenter
+spec:
+  template:
+    metadata:
+      labels:
+        workload-type: spot
+        managed-by: karpenter
+
+    spec:
+      # Node expiration - replace spot nodes after 7 days
+      expireAfter: 168h
+
+      nodeClassRef:
+        group: karpenter.k8s.aws
+        kind: EC2NodeClass
+        name: default
+
+      # Taint for spot instances
+      taints:
+        - key: spot
+          value: "true"
+          effect: NoSchedule
+
+      requirements:
+        # Wider instance type selection for spot availability
+        - key: karpenter.k8s.aws/instance-category
+          operator: In
+          values: ["t3", "t3a", "t2"]
+
+        - key: karpenter.k8s.aws/instance-size
+          operator: In
+          values: ["small", "medium", "large"]
+
+        - key: kubernetes.io/arch
+          operator: In
+          values: ["amd64"]
+
+        # ONLY spot instances
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values: ["spot"]
+
+        - key: topology.kubernetes.io/zone
+          operator: In
+          values: ["us-east-1a", "us-east-1b", "us-east-1c"]
+
+  limits:
+    cpu: "50"
+    memory: 100Gi
+
+  disruption:
+    consolidationPolicy: WhenEmptyOrUnderutilized
+    consolidateAfter: 30s
+
+    budgets:
+      - nodes: "20%"
+        reasons:
+          - Underutilized
+          - Empty
+
+  # Lower weight (less preferred than on-demand)
+  weight: 5

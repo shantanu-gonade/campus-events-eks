@@ -33,6 +33,7 @@ provider "aws" {
 
 locals {
   cluster_name = "campus-events-dev"
+  oidc_provider = replace(module.eks.cluster_oidc_issuer_url, "https://", "")
 }
 
 # Data source for AWS account ID
@@ -106,6 +107,21 @@ module "rds" {
   performance_insights_retention_period = 7
 
   environment = "dev"
+
+  tags = {
+    Project = "campus-events"
+  }
+}
+
+# Karpenter Module
+module "karpenter" {
+  source = "../../modules/karpenter"
+
+  cluster_name       = local.cluster_name
+  region             = var.region
+  oidc_provider_arn  = module.eks.oidc_provider_arn
+  oidc_provider      = local.oidc_provider
+  karpenter_namespace = "karpenter"
 
   tags = {
     Project = "campus-events"
