@@ -39,8 +39,35 @@ spec:
         paths:
           # IMPORTANT: Order matters! More specific paths must come before less specific ones
           
+          # API Documentation - Swagger UI (must come before /api prefix)
+          - path: /api-docs
+            pathType: Prefix
+            backend:
+              service:
+                name: dev-events-api-service
+                port:
+                  number: 8080
+          
           # Events API - Most specific first
           - path: /api/v1/events
+            pathType: Prefix
+            backend:
+              service:
+                name: dev-events-api-service
+                port:
+                  number: 8080
+          
+          # Analytics API
+          - path: /api/v1/analytics
+            pathType: Prefix
+            backend:
+              service:
+                name: dev-events-api-service
+                port:
+                  number: 8080
+          
+          # Recommendations API
+          - path: /api/v1/recommendations
             pathType: Prefix
             backend:
               service:
@@ -58,6 +85,15 @@ spec:
                   number: 8080
                   
           - path: /api/ready
+            pathType: Exact
+            backend:
+              service:
+                name: dev-events-api-service
+                port:
+                  number: 8080
+          
+          # Metrics endpoint
+          - path: /metrics
             pathType: Exact
             backend:
               service:

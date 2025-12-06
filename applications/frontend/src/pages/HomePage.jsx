@@ -11,6 +11,7 @@ import { Add as AddIcon, Event as EventIcon } from '@mui/icons-material';
 import { Link } from 'react-router-dom';
 import useEventStore from '../store/eventStore';
 import EventList from '../components/events/EventList';
+import RecommendedEvents from '../components/events/RecommendedEvents';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 
 const HomePage = () => {
@@ -107,6 +108,9 @@ const HomePage = () => {
           </Paper>
         </Grid>
       </Grid>
+
+      {/* Recommended Events */}
+      <RecommendedEvents />
 
       {/* Featured Events */}
       <Box sx={{ mb: 4 }}>

@@ -5,6 +5,7 @@ import HomePage from './pages/HomePage';
 import EventsPage from './pages/EventsPage';
 import EventDetailPage from './pages/EventDetailPage';
 import CreateEventPage from './pages/CreateEventPage';
+import EditEventPage from './pages/EditEventPage';
 import AdminDashboard from './pages/AdminDashboard';
 import NotFoundPage from './pages/NotFoundPage';
 import { useWebSocket } from './hooks/useWebSocket';
@@ -62,6 +63,7 @@ function App() {
         <Route index element={<HomePage />} />
         <Route path="events" element={<EventsPage />} />
         <Route path="events/:id" element={<EventDetailPage />} />
+        <Route path="events/:id/edit" element={<EditEventPage />} />
         <Route path="events/create" element={<CreateEventPage />} />
         <Route path="admin" element={<AdminDashboard />} />
         <Route path="*" element={<NotFoundPage />} />

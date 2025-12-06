@@ -9,8 +9,11 @@ import cors from 'cors'
 import morgan from 'morgan'
 import rateLimit from 'express-rate-limit'
 import promClient from 'prom-client'
+import swaggerUi from 'swagger-ui-express'
+import swaggerSpec from './config/swagger.js'
 import eventRoutes from './routes/events.js'
 import analyticsRoutes from './routes/analytics.js'
+import recommendationRoutes from './routes/recommendations.js'
 import { errorHandler } from './middleware/errorHandler.js'
 import logger from './utils/logger.js'
 import { createServer } from 'http'
@@ -85,7 +88,9 @@ app.use((req, res, next) => {
 })
 
 // Security middleware
-app.use(helmet())
+app.use(helmet({
+  contentSecurityPolicy: false // Disable for Swagger UI
+}))
 
 // CORS configuration - handle multiple origins properly
 const allowedOrigins = process.env.CORS_ORIGIN 
@@ -134,6 +139,12 @@ app.use(morgan('combined'))
 app.use(express.json({ limit: '10mb' }))
 app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 
+// API Documentation
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+  customCss: '.swagger-ui .topbar { display: none }',
+  customSiteTitle: 'Campus Events API Documentation'
+}))
+
 // Metrics endpoint
 app.get('/metrics', async (req, res) => {
   res.set('Content-Type', register.contentType)
@@ -177,6 +188,10 @@ app.use('/api/v1/events', eventRoutes)
 app.use('/v1/analytics', analyticsRoutes)
 app.use('/api/v1/analytics', analyticsRoutes)
 
+// Recommendation routes
+app.use('/v1', recommendationRoutes)
+app.use('/api/v1', recommendationRoutes)
+
 // 404 handler
 app.use((req, res) => {
   res.status(404).json({ error: 'Not found' })
@@ -189,6 +204,7 @@ app.use(errorHandler)
 httpServer.listen(PORT, '0.0.0.0', () => {
   logger.info(`Events API listening on port ${PORT}`)
   logger.info(`WebSocket server ready on port ${PORT}`)
+  logger.info(`API Documentation available at http://localhost:${PORT}/api-docs`)
 })
 
 // Graceful shutdown

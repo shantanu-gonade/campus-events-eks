@@ -15,10 +15,11 @@ import useAnalyticsStore from '../store/analyticsStore';
 import StatCard from '../components/dashboard/StatCard';
 import EventsChart from '../components/dashboard/EventsChart';
 import CategoryChart from '../components/dashboard/CategoryChart';
+import AttendanceChart from '../components/dashboard/AttendanceChart';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 
 const AdminDashboard = () => {
-  const { statistics, categories, trends, loading, fetchAnalytics } = useAnalyticsStore();
+  const { statistics, categories, trends, attendance, loading, fetchAnalytics } = useAnalyticsStore();
 
   useEffect(() => {
     fetchAnalytics();
@@ -35,9 +36,9 @@ const AdminDashboard = () => {
   // Prepare chart data with safe defaults
   const trendsData = Array.isArray(trends) 
     ? trends.map(t => ({
-        month: t.month || 'N/A',
-        events: parseInt(t.event_count) || 0,
-        rsvps: parseInt(t.rsvp_count) || 0,
+        month: t.month_label || t.month || 'N/A',
+        events: parseInt(t.events_created) || 0,
+        rsvps: parseInt(t.total_rsvps) || 0,
       }))
     : [];
 
@@ -46,6 +47,16 @@ const AdminDashboard = () => {
         category: c.category || 'Unknown',
         count: parseInt(c.count) || 0,
         name: c.category || 'Unknown',
+      }))
+    : [];
+
+  // Prepare attendance data - use most_popular which has proper structure
+  const attendanceData = Array.isArray(attendance?.most_popular) && attendance.most_popular.length > 0
+    ? attendance.most_popular.map(event => ({
+        title: event.title || 'Untitled',
+        attendance_rate: parseFloat(event.attendance_rate) || 0,
+        current_attendees: event.current_attendees || 0,
+        max_attendees: event.max_attendees || 0,
       }))
     : [];
 
@@ -103,22 +114,33 @@ const AdminDashboard = () => {
       </Grid>
 
       {/* Charts */}
-      {(trendsData.length > 0 || categoryData.length > 0) ? (
-        <Grid container spacing={3}>
-          {/* Events Trend Chart */}
-          {trendsData.length > 0 && (
-            <Grid size={{ xs: 12, md: 8 }}>
-              <EventsChart data={trendsData} />
-            </Grid>
-          )}
+      {(trendsData.length > 0 || categoryData.length > 0 || attendanceData.length > 0) ? (
+        <>
+          <Grid container spacing={3} sx={{ mb: 3 }}>
+            {/* Events Trend Chart */}
+            {trendsData.length > 0 && (
+              <Grid size={{ xs: 12, md: 8 }}>
+                <EventsChart data={trendsData} />
+              </Grid>
+            )}
 
-          {/* Category Distribution */}
-          {categoryData.length > 0 && (
-            <Grid size={{ xs: 12, md: 4 }}>
-              <CategoryChart data={categoryData} />
+            {/* Category Distribution */}
+            {categoryData.length > 0 && (
+              <Grid size={{ xs: 12, md: 4 }}>
+                <CategoryChart data={categoryData} />
+              </Grid>
+            )}
+          </Grid>
+
+          {/* Attendance Chart */}
+          {attendanceData.length > 0 && (
+            <Grid container spacing={3}>
+              <Grid size={{ xs: 12 }}>
+                <AttendanceChart data={attendanceData} />
+              </Grid>
             </Grid>
           )}
-        </Grid>
+        </>
       ) : (
         <Box sx={{ textAlign: 'center', py: 8 }}>
           <Typography variant="h6" color="text.secondary">
