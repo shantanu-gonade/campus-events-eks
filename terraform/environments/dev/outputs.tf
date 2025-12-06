@@ -93,3 +93,24 @@ output "github_oidc_provider_arn" {
   description = "ARN of the GitHub OIDC provider"
   value       = module.github_oidc.oidc_provider_arn
 }
+
+# Karpenter Outputs
+output "karpenter_controller_role_arn" {
+  description = "ARN of the Karpenter controller IAM role"
+  value       = module.karpenter.controller_role_arn
+}
+
+output "karpenter_node_role_arn" {
+  description = "ARN of the Karpenter node IAM role"
+  value       = module.karpenter.node_role_arn
+}
+
+output "karpenter_node_instance_profile_name" {
+  description = "Name of the Karpenter node instance profile"
+  value       = module.karpenter.node_instance_profile_name
+}
+
+output "karpenter_sqs_queue_name" {
+  description = "Name of the SQS queue for Karpenter interruption handling"
+  value       = module.karpenter.sqs_queue_name
+}

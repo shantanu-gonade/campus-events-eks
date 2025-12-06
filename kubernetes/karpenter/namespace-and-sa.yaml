@@ -1,0 +1,24 @@
+#============================================================================
+# Karpenter Namespace
+#============================================================================
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: karpenter
+  labels:
+    name: karpenter
+    project: campus-events
+---
+#============================================================================
+# Service Account for Karpenter Controller with IRSA
+#============================================================================
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: karpenter
+  namespace: karpenter
+  annotations:
+    eks.amazonaws.com/role-arn: ${KARPENTER_IAM_ROLE_ARN}
+  labels:
+    app.kubernetes.io/name: karpenter
+    app.kubernetes.io/instance: karpenter

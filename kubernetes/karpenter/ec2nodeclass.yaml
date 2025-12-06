@@ -1,0 +1,56 @@
+#============================================================================
+# Karpenter EC2NodeClass for campus-events-dev
+#============================================================================
+# Defines the node configuration for instances launched by Karpenter
+#============================================================================
+apiVersion: karpenter.k8s.aws/v1
+kind: EC2NodeClass
+metadata:
+  name: default
+  namespace: karpenter
+spec:
+  # AMI Selection - using EKS optimized AMI
+  amiSelectorTerms:
+    - alias: al2023@latest  # Amazon Linux 2023 EKS optimized
+  
+  # IAM Role for nodes
+  role: campus-events-dev-karpenter-node
+  
+  # Subnet selection - use private subnets with proper tags
+  subnetSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: campus-events-dev
+  
+  # Security group selection
+  securityGroupSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: campus-events-dev
+  
+  # User data for node initialization
+  userData: |
+    #!/bin/bash
+    # Bootstrap EKS node
+    /etc/eks/bootstrap.sh campus-events-dev
+  
+  # Block device mappings
+  blockDeviceMappings:
+    - deviceName: /dev/xvda
+      ebs:
+        volumeSize: 20Gi
+        volumeType: gp3
+        encrypted: true
+        deleteOnTermination: true
+  
+  # Metadata options for IMDS
+  metadataOptions:
+    httpEndpoint: enabled
+    httpProtocolIPv6: disabled
+    httpPutResponseHopLimit: 1
+    httpTokens: required  # Require IMDSv2
+  
+  # Tags to apply to EC2 instances
+  tags:
+    Name: karpenter-node
+    Project: campus-events
+    Environment: dev
+    ManagedBy: karpenter
