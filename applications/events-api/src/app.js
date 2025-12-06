@@ -1,21 +1,52 @@
+// Load environment variables FIRST before any other imports
+import dotenv from 'dotenv'
+dotenv.config()
+
+// Now import everything else
 import express from 'express'
 import helmet from 'helmet'
 import cors from 'cors'
 import morgan from 'morgan'
 import rateLimit from 'express-rate-limit'
-import dotenv from 'dotenv'
 import promClient from 'prom-client'
 import eventRoutes from './routes/events.js'
+import analyticsRoutes from './routes/analytics.js'
 import { errorHandler } from './middleware/errorHandler.js'
 import logger from './utils/logger.js'
-
-dotenv.config()
+import { createServer } from 'http'
+import { Server } from 'socket.io'
 
 const app = express()
+const httpServer = createServer(app)
 const PORT = process.env.PORT || 8080
 
-// Trust proxy for ALB
-app.set('trust proxy', true)
+// Socket.IO setup - handle multiple origins
+const socketAllowedOrigins = process.env.CORS_ORIGIN 
+  ? process.env.CORS_ORIGIN.split(',').map(o => o.trim())
+  : ['*']
+
+const io = new Server(httpServer, {
+  cors: {
+    origin: socketAllowedOrigins,
+    credentials: true
+  }
+})
+
+// Socket.IO connection handling
+io.on('connection', (socket) => {
+  logger.info(`WebSocket client connected: ${socket.id}`)
+  
+  socket.on('disconnect', () => {
+    logger.info(`WebSocket client disconnected: ${socket.id}`)
+  })
+})
+
+// Export io for use in controllers
+export { io }
+
+// Trust proxy configuration (only enable in production behind ALB)
+const trustProxy = process.env.TRUST_PROXY === 'true' || process.env.NODE_ENV === 'production'
+app.set('trust proxy', trustProxy)
 
 // Prometheus metrics setup
 const register = new promClient.Registry()
@@ -55,15 +86,44 @@ app.use((req, res, next) => {
 
 // Security middleware
 app.use(helmet())
+
+// CORS configuration - handle multiple origins properly
+const allowedOrigins = process.env.CORS_ORIGIN 
+  ? process.env.CORS_ORIGIN.split(',').map(o => o.trim())
+  : ['*']
+
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || '*',
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like curl, Postman)
+    if (!origin) return callback(null, true)
+    
+    // Allow all if * specified
+    if (allowedOrigins.includes('*')) return callback(null, true)
+    
+    // Check if origin is in allowed list
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true)
+    } else {
+      callback(new Error('Not allowed by CORS'))
+    }
+  },
   credentials: true
 }))
 
 // Rate limiting
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100 // limit each IP to 100 requests per windowMs
+  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes default
+  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100, // limit each IP
+  message: 'Too many requests from this IP, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
+  // Skip rate limiting in development if trust proxy is false
+  skip: (req) => {
+    if (process.env.NODE_ENV === 'development' && !trustProxy) {
+      return false // Still apply rate limit in dev for testing
+    }
+    return false
+  }
 })
 app.use('/api/', limiter)
 
@@ -113,6 +173,10 @@ app.get('/api/ready', async (req, res) => {
 app.use('/v1/events', eventRoutes)
 app.use('/api/v1/events', eventRoutes)
 
+// Analytics routes
+app.use('/v1/analytics', analyticsRoutes)
+app.use('/api/v1/analytics', analyticsRoutes)
+
 // 404 handler
 app.use((req, res) => {
   res.status(404).json({ error: 'Not found' })
@@ -122,8 +186,9 @@ app.use((req, res) => {
 app.use(errorHandler)
 
 // Start server
-app.listen(PORT, '0.0.0.0', () => {
+httpServer.listen(PORT, '0.0.0.0', () => {
   logger.info(`Events API listening on port ${PORT}`)
+  logger.info(`WebSocket server ready on port ${PORT}`)
 })
 
 // Graceful shutdown
