@@ -1,0 +1,45 @@
+---
+# ServiceMonitor for Events API
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: events-api-servicemonitor
+  namespace: monitoring
+  labels:
+    app: events-api
+    release: kube-prom-stack
+spec:
+  selector:
+    matchLabels:
+      app: events-api
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s
+  namespaceSelector:
+    matchNames:
+    - campus-events
+
+---
+# ServiceMonitor for Notification Service
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: notification-service-servicemonitor
+  namespace: monitoring
+  labels:
+    app: notification-service
+    release: kube-prom-stack
+spec:
+  selector:
+    matchLabels:
+      app: notification-service
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s
+  namespaceSelector:
+    matchNames:
+    - campus-events

@@ -1,0 +1,20 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: frontend-metrics
+  namespace: campus-events
+  labels:
+    app: frontend
+    release: kube-prom-stack
+spec:
+  selector:
+    matchLabels:
+      app: frontend
+  endpoints:
+  - port: http
+    interval: 30s
+    path: /metrics
+    scheme: http
+  namespaceSelector:
+    matchNames:
+    - campus-events

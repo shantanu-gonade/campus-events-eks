@@ -1,0 +1,20 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: notification-service-metrics
+  namespace: campus-events
+  labels:
+    app: notification-service
+    release: kube-prom-stack
+spec:
+  selector:
+    matchLabels:
+      app: notification-service
+  endpoints:
+  - port: http
+    interval: 30s
+    path: /metrics
+    scheme: http
+  namespaceSelector:
+    matchNames:
+    - campus-events
