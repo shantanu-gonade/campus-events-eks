@@ -1,94 +1,73 @@
-import { useState, useEffect } from 'react'
-import axios from 'axios'
-import './App.css'
-
-// Use relative path so it works through the ALB
-// When accessed via ALB, /api routes to the backend service
-const API_URL = import.meta.env.VITE_API_URL || ''
+import { Routes, Route } from 'react-router-dom';
+import { useEffect } from 'react';
+import Layout from './components/layout/Layout';
+import HomePage from './pages/HomePage';
+import EventsPage from './pages/EventsPage';
+import EventDetailPage from './pages/EventDetailPage';
+import CreateEventPage from './pages/CreateEventPage';
+import AdminDashboard from './pages/AdminDashboard';
+import NotFoundPage from './pages/NotFoundPage';
+import { useWebSocket } from './hooks/useWebSocket';
+import useEventStore from './store/eventStore';
+import toast from 'react-hot-toast';
 
 function App() {
-  const [events, setEvents] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
+  const { subscribeToAll } = useWebSocket();
+  const { addEvent, updateEventInList, removeEvent } = useEventStore();
 
   useEffect(() => {
-    fetchEvents()
-  }, [])
+    // Subscribe to WebSocket events for real-time updates
+    const unsubscribe = subscribeToAll({
+      onEventCreated: (event) => {
+        addEvent(event);
+        toast.success(`New event created: ${event.title}`, {
+          duration: 4000,
+          icon: '🎉',
+        });
+      },
+      onEventUpdated: (event) => {
+        updateEventInList(event);
+        toast.success(`Event updated: ${event.title}`, {
+          duration: 3000,
+          icon: '✏️',
+        });
+      },
+      onEventDeleted: ({ id }) => {
+        removeEvent(id);
+        toast.success('Event deleted', {
+          duration: 3000,
+          icon: '🗑️',
+        });
+      },
+      onRSVPCreated: (rsvp) => {
+        toast.success('New RSVP registered!', {
+          duration: 3000,
+          icon: '👥',
+        });
+      },
+      onCapacityWarning: (event) => {
+        toast.error(`${event.title} is 90% full!`, {
+          duration: 5000,
+          icon: '⚠️',
+        });
+      },
+    });
 
-  const fetchEvents = async () => {
-    try {
-      setLoading(true)
-      const response = await axios.get(`${API_URL}/api/v1/events`)
-      setEvents(response.data)
-      setError(null)
-    } catch (err) {
-      setError('Failed to load events. API may not be running.')
-      console.error('Error fetching events:', err)
-    } finally {
-      setLoading(false)
-    }
-  }
+    return unsubscribe;
+  }, [subscribeToAll, addEvent, updateEventInList, removeEvent]);
 
   return (
-    <div className="App">
-      <header className="App-header">
-        <h1>Campus Events Management</h1>
-        <p>Kubernetes-based Microservices Platform</p>
-      </header>
-
-      <main className="container">
-        <section className="events-section">
-          <h2>Upcoming Events</h2>
-          
-          {loading && <p className="loading">Loading events...</p>}
-          
-          {error && (
-            <div className="error-message">
-              <p>{error}</p>
-              <button onClick={fetchEvents}>Retry</button>
-            </div>
-          )}
-
-          {!loading && !error && events.length === 0 && (
-            <p className="no-events">No events found. Create your first event!</p>
-          )}
-
-          {!loading && !error && events.length > 0 && (
-            <div className="events-grid">
-              {events.map((event) => (
-                <div key={event.id} className="event-card">
-                  <h3>{event.title}</h3>
-                  <p className="event-date">
-                    📅 {new Date(event.start_time).toLocaleString()}
-                  </p>
-                  <p className="event-description">{event.description}</p>
-                  <p className="event-location">📍 {event.location}</p>
-                  <p className="event-capacity">
-                    👥 {event.current_attendees}/{event.max_attendees} attendees
-                  </p>
-                  <p className="event-category">🏷️ {event.category}</p>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-
-        <section className="info-section">
-          <h3>System Status</h3>
-          <div className="status-card">
-            <p>✅ Frontend: Running</p>
-            <p>{error ? '❌' : '✅'} Backend API: {error ? 'Disconnected' : 'Connected'}</p>
-            <p>🚀 Deployed on: AWS EKS</p>
-          </div>
-        </section>
-      </main>
-
-      <footer>
-        <p>ENPM818R - Cloud Computing Project</p>
-        <p>Container-based deployment with Docker & Kubernetes</p>
-      </footer>
-    </div>
-  )
+    <Routes>
+      <Route path="/" element={<Layout />}>
+        <Route index element={<HomePage />} />
+        <Route path="events" element={<EventsPage />} />
+        <Route path="events/:id" element={<EventDetailPage />} />
+        <Route path="events/create" element={<CreateEventPage />} />
+        <Route path="admin" element={<AdminDashboard />} />
+        <Route path="*" element={<NotFoundPage />} />
+      </Route>
+    </Routes>
+  );
 }
 
-export default App
+export default App;

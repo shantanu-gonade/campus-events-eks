@@ -11,9 +11,8 @@ data:
   init-schema.sql: |
     -- Campus Events Management System Database Schema
     -- PostgreSQL 16.3
-    -- Created: December 2025
-    -- Environment: Development
-
+    -- Using official schema from /docs/DATABASE_SCHEMA.sql
+    
     -- Enable UUID extension
     CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
@@ -85,7 +84,7 @@ data:
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     );
 
-    -- Indexes for performance optimization
+    -- Indexes for performance
     CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
     CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
     CREATE INDEX IF NOT EXISTS idx_events_organizer ON events(organizer_id);
@@ -108,12 +107,12 @@ data:
     END;
     $$ language 'plpgsql';
 
-    -- Drop existing triggers if they exist
+    -- Drop existing triggers
     DROP TRIGGER IF EXISTS update_users_updated_at ON users;
     DROP TRIGGER IF EXISTS update_events_updated_at ON events;
     DROP TRIGGER IF EXISTS update_rsvps_updated_at ON rsvps;
 
-    -- Apply update_updated_at trigger to all tables
+    -- Create triggers for updated_at
     CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users
         FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
@@ -123,18 +122,16 @@ data:
     CREATE TRIGGER update_rsvps_updated_at BEFORE UPDATE ON rsvps
         FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-    -- Function to update current_attendees when RSVP is created/updated
+    -- Function to update current_attendees
     CREATE OR REPLACE FUNCTION update_event_attendees()
     RETURNS TRIGGER AS $$
     BEGIN
-        -- Decrease count for old status (on UPDATE)
         IF TG_OP = 'UPDATE' THEN
             IF OLD.status = 'confirmed' THEN
                 UPDATE events SET current_attendees = current_attendees - 1 WHERE id = OLD.event_id;
             END IF;
         END IF;
 
-        -- Decrease count on DELETE
         IF TG_OP = 'DELETE' THEN
             IF OLD.status = 'confirmed' THEN
                 UPDATE events SET current_attendees = current_attendees - 1 WHERE id = OLD.event_id;
@@ -142,7 +139,6 @@ data:
             RETURN OLD;
         END IF;
 
-        -- Increase count for new status
         IF NEW.status = 'confirmed' THEN
             UPDATE events SET current_attendees = current_attendees + 1 WHERE id = NEW.event_id;
         END IF;
@@ -151,14 +147,13 @@ data:
     END;
     $$ language 'plpgsql';
 
-    -- Drop existing trigger if it exists
     DROP TRIGGER IF EXISTS update_event_attendees_on_rsvp ON rsvps;
 
     CREATE TRIGGER update_event_attendees_on_rsvp
         AFTER INSERT OR UPDATE OR DELETE ON rsvps
         FOR EACH ROW EXECUTE FUNCTION update_event_attendees();
 
-    -- Insert default event categories (use INSERT ON CONFLICT to avoid duplicates)
+    -- Insert default event categories
     INSERT INTO event_categories (name, description) VALUES
         ('Workshop', 'Technical workshops and training sessions'),
         ('Seminar', 'Educational seminars and lectures'),
@@ -172,13 +167,74 @@ data:
         ('Other', 'Other events')
     ON CONFLICT (name) DO NOTHING;
 
-    -- Create a sample admin user (password: Admin123!)
-    -- Password hash for 'Admin123!' using bcrypt
+    -- Create sample users (for MVP - no auth yet)
     INSERT INTO users (email, password_hash, first_name, last_name, role, department) VALUES
+        ('organizer@campus.edu', 'temp_hash', 'Demo', 'Organizer', 'organizer', 'Student Affairs'),
         ('admin@campus.edu', '$2b$10$rKZvFvFZXmUhKxmXxVxqPeqYhNUZVXFXGXXGGzZZZZZZZZZZZZZZZZ', 'System', 'Admin', 'admin', 'IT')
     ON CONFLICT (email) DO NOTHING;
 
-    -- Add comments to tables for documentation
+    -- Insert sample events for testing/demo
+    INSERT INTO events (title, description, location, start_time, end_time, max_attendees, organizer_id, category)
+    SELECT 
+        'Welcome Week Kickoff',
+        'Join us for an exciting start to the semester with activities, food, and networking opportunities!',
+        'Student Center Plaza',
+        CURRENT_TIMESTAMP + INTERVAL '7 days',
+        CURRENT_TIMESTAMP + INTERVAL '7 days 3 hours',
+        200,
+        (SELECT id FROM users WHERE role = 'organizer' LIMIT 1),
+        'Social'
+    WHERE NOT EXISTS (SELECT 1 FROM events WHERE title = 'Welcome Week Kickoff');
+
+    INSERT INTO events (title, description, location, start_time, end_time, max_attendees, organizer_id, category)
+    SELECT 
+        'Cloud Computing Workshop',
+        'Learn about AWS, Azure, and modern cloud architecture in this hands-on workshop. Perfect for ENPM818R students!',
+        'Engineering Building Room 301',
+        CURRENT_TIMESTAMP + INTERVAL '14 days',
+        CURRENT_TIMESTAMP + INTERVAL '14 days 2 hours',
+        50,
+        (SELECT id FROM users WHERE role = 'organizer' LIMIT 1),
+        'Workshop'
+    WHERE NOT EXISTS (SELECT 1 FROM events WHERE title = 'Cloud Computing Workshop');
+
+    INSERT INTO events (title, description, location, start_time, end_time, max_attendees, organizer_id, category)
+    SELECT 
+        'Career Fair 2025',
+        'Meet with top employers including Amazon, Google, Microsoft, and more. Explore internship and full-time opportunities.',
+        'University Center Ballroom',
+        CURRENT_TIMESTAMP + INTERVAL '21 days',
+        CURRENT_TIMESTAMP + INTERVAL '21 days 5 hours',
+        500,
+        (SELECT id FROM users WHERE role = 'organizer' LIMIT 1),
+        'Career'
+    WHERE NOT EXISTS (SELECT 1 FROM events WHERE title = 'Career Fair 2025');
+
+    INSERT INTO events (title, description, location, start_time, end_time, max_attendees, organizer_id, category)
+    SELECT 
+        'Hackathon 2025',
+        '24-hour coding marathon with amazing prizes! Bring your ideas, form teams, and build something awesome.',
+        'Innovation Lab',
+        CURRENT_TIMESTAMP + INTERVAL '28 days',
+        CURRENT_TIMESTAMP + INTERVAL '29 days',
+        100,
+        (SELECT id FROM users WHERE role = 'organizer' LIMIT 1),
+        'Hackathon'
+    WHERE NOT EXISTS (SELECT 1 FROM events WHERE title = 'Hackathon 2025');
+
+    INSERT INTO events (title, description, location, start_time, end_time, max_attendees, organizer_id, category)
+    SELECT 
+        'Spring Concert',
+        'Live music featuring student bands and special guest performers. Free food and drinks!',
+        'Outdoor Amphitheater',
+        CURRENT_TIMESTAMP + INTERVAL '35 days',
+        CURRENT_TIMESTAMP + INTERVAL '35 days 4 hours',
+        1000,
+        (SELECT id FROM users WHERE role = 'organizer' LIMIT 1),
+        'Cultural'
+    WHERE NOT EXISTS (SELECT 1 FROM events WHERE title = 'Spring Concert');
+
+    -- Add table comments
     COMMENT ON TABLE users IS 'Stores user account information including students, organizers, and administrators';
     COMMENT ON TABLE events IS 'Stores event details including scheduling, capacity, and metadata';
     COMMENT ON TABLE rsvps IS 'Manages user RSVPs and waitlist status for events';
@@ -195,8 +251,8 @@ metadata:
     app: database-init
     component: job
 spec:
-  ttlSecondsAfterFinished: 300  # Clean up after 5 minutes
-  backoffLimit: 3  # Retry up to 3 times if failed
+  ttlSecondsAfterFinished: 300
+  backoffLimit: 3
   template:
     metadata:
       labels:
@@ -212,81 +268,63 @@ spec:
         - -c
         - |
           set -e
-          echo "================================================================================================="
-          echo " Database Schema Initialization Job"
-          echo "================================================================================================="
+          echo "======================================================================================================="
+          echo " Campus Events Database Initialization"
+          echo " Using schema from: /docs/DATABASE_SCHEMA.sql"
+          echo "======================================================================================================="
           echo ""
           echo "Database: ${PGHOST}:${PGPORT}/${PGDATABASE}"
           echo "User: ${PGUSER}"
           echo ""
           
-          # Test connection
-          echo "Testing database connection..."
+          echo "Testing connection..."
           if psql -c "SELECT version();" > /dev/null 2>&1; then
-            echo "✓ Database connection successful"
+            echo "✓ Connected successfully"
+            echo ""
+            psql -c "SELECT version();"
           else
-            echo "✗ Failed to connect to database"
+            echo "✗ Connection failed"
             exit 1
           fi
           echo ""
           
-          # Show current tables
-          echo "Current tables (before initialization):"
-          psql -c "SELECT tablename FROM pg_tables WHERE schemaname = 'public';" || echo "  (no tables yet)"
+          echo "Current tables:"
+          psql -c "SELECT tablename FROM pg_tables WHERE schemaname = 'public';" || echo "  (none)"
           echo ""
           
-          # Execute schema file
-          echo "Executing schema initialization..."
+          echo "Executing schema..."
           psql -f /schema/init-schema.sql
           echo ""
           
-          # Show created tables
           echo "Tables created:"
           psql -c "SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename;"
           echo ""
           
-          # Show table counts
-          echo "Initial data counts:"
+          echo "Data inserted:"
           psql -c "
-            SELECT 'users' as table_name, COUNT(*) as count FROM users
-            UNION ALL
-            SELECT 'events', COUNT(*) FROM events
-            UNION ALL
-            SELECT 'rsvps', COUNT(*) FROM rsvps
-            UNION ALL
-            SELECT 'notifications', COUNT(*) FROM notifications
-            UNION ALL
-            SELECT 'event_categories', COUNT(*) FROM event_categories
-            ORDER BY table_name;
+            SELECT 'users' as table, COUNT(*)::text as count FROM users
+            UNION ALL SELECT 'events', COUNT(*)::text FROM events
+            UNION ALL SELECT 'rsvps', COUNT(*)::text FROM rsvps
+            UNION ALL SELECT 'notifications', COUNT(*)::text FROM notifications
+            UNION ALL SELECT 'event_categories', COUNT(*)::text FROM event_categories
+            ORDER BY table;
           "
           echo ""
           
-          # Verify schema integrity
-          echo "Verifying schema integrity..."
-          TABLES="users events rsvps notifications event_categories"
-          ALL_OK=true
-          
-          for table in $TABLES; do
+          echo "Verifying schema..."
+          for table in users events rsvps notifications event_categories; do
             if psql -c "SELECT 1 FROM $table LIMIT 1;" > /dev/null 2>&1; then
-              echo "✓ Table '$table' exists and is accessible"
+              echo "✓ Table '$table' OK"
             else
-              echo "✗ Table '$table' not found or not accessible"
-              ALL_OK=false
+              echo "✗ Table '$table' ERROR"
+              exit 1
             fi
           done
           echo ""
           
-          if [ "$ALL_OK" = "true" ]; then
-            echo "================================================================================================="
-            echo " ✓ Database initialization completed successfully!"
-            echo "================================================================================================="
-            exit 0
-          else
-            echo "================================================================================================="
-            echo " ✗ Database initialization completed with errors"
-            echo "================================================================================================="
-            exit 1
-          fi
+          echo "======================================================================================================="
+          echo " ✓ Database initialization completed successfully!"
+          echo "======================================================================================================="
         env:
         - name: PGHOST
           valueFrom:
@@ -328,12 +366,12 @@ spec:
             cpu: "200m"
         securityContext:
           runAsNonRoot: true
-          runAsUser: 999  # postgres user in postgres image
+          runAsUser: 999
           allowPrivilegeEscalation: false
           capabilities:
             drop:
             - ALL
-          readOnlyRootFilesystem: false  # psql needs to write temp files
+          readOnlyRootFilesystem: false
       volumes:
       - name: schema
         configMap:
