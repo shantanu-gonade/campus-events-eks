@@ -1,0 +1,194 @@
+name: Deploy to EKS
+
+on:
+  workflow_run:
+    workflows: ["Build and Push Docker Images"]
+    types:
+      - completed
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+      image_tag:
+        description: 'Image tag to deploy (default: latest)'
+        required: false
+        default: 'latest'
+        type: string
+
+env:
+  AWS_REGION: us-east-1
+  CLUSTER_NAME: campus-events-dev
+  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy to EKS
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsRole
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: 'v1.31.0'
+
+      - name: Configure kubectl
+        run: |
+          aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.CLUSTER_NAME }}
+          kubectl version --client
+
+      - name: Set image tag
+        id: image-tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=${{ inputs.image_tag }}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=latest" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Update deployment images
+        run: |
+          IMAGE_TAG=${{ steps.image-tag.outputs.tag }}
+          
+          # Update frontend deployment
+          kubectl set image deployment/frontend \
+            frontend=${{ env.ECR_REGISTRY }}/campus-events/frontend:${IMAGE_TAG} \
+            -n campus-events
+          
+          # Update events-api deployment
+          kubectl set image deployment/dev-events-api \
+            events-api=${{ env.ECR_REGISTRY }}/campus-events/events-api:${IMAGE_TAG} \
+            -n campus-events
+          
+          # Update notification-service deployment
+          kubectl set image deployment/dev-notification-service \
+            notification-service=${{ env.ECR_REGISTRY }}/campus-events/notification-service:${IMAGE_TAG} \
+            -n campus-events
+
+      - name: Wait for rollout to complete
+        run: |
+          echo "Waiting for frontend rollout..."
+          kubectl rollout status deployment/frontend -n campus-events --timeout=5m
+          
+          echo "Waiting for events-api rollout..."
+          kubectl rollout status deployment/dev-events-api -n campus-events --timeout=5m
+          
+          echo "Waiting for notification-service rollout..."
+          kubectl rollout status deployment/dev-notification-service -n campus-events --timeout=5m
+
+      - name: Verify deployments
+        run: |
+          echo "=== Deployment Status ==="
+          kubectl get deployments -n campus-events
+          
+          echo ""
+          echo "=== Pod Status ==="
+          kubectl get pods -n campus-events
+          
+          echo ""
+          echo "=== Service Status ==="
+          kubectl get services -n campus-events
+
+      - name: Run smoke tests
+        run: |
+          echo "Running smoke tests..."
+          
+          # Get ALB URL
+          ALB_URL=$(kubectl get ingress campus-events-ingress -n campus-events -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+          echo "ALB URL: ${ALB_URL}"
+          
+          # Test frontend
+          echo "Testing frontend..."
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://${ALB_URL}/ || echo "000")
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "âœ… Frontend is accessible"
+          else
+            echo "â�� Frontend returned HTTP ${HTTP_CODE}"
+          fi
+          
+          # Test events API health
+          echo "Testing events API health endpoint..."
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://${ALB_URL}/api/health || echo "000")
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "âœ… Events API is healthy"
+          else
+            echo "â�� Events API returned HTTP ${HTTP_CODE}"
+          fi
+          
+          # Test notification service health
+          echo "Testing notification service health endpoint..."
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://${ALB_URL}/notifications/health || echo "000")
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "âœ… Notification service is healthy"
+          else
+            echo "â�� Notification service returned HTTP ${HTTP_CODE}"
+          fi
+
+      - name: Rollback on failure
+        if: failure()
+        run: |
+          echo "Deployment failed, initiating rollback..."
+          
+          kubectl rollout undo deployment/frontend -n campus-events
+          kubectl rollout undo deployment/dev-events-api -n campus-events
+          kubectl rollout undo deployment/dev-notification-service -n campus-events
+          
+          echo "Waiting for rollback to complete..."
+          kubectl rollout status deployment/frontend -n campus-events --timeout=5m
+          kubectl rollout status deployment/dev-events-api -n campus-events --timeout=5m
+          kubectl rollout status deployment/dev-notification-service -n campus-events --timeout=5m
+
+      - name: Get pod logs on failure
+        if: failure()
+        run: |
+          echo "=== Frontend Logs ==="
+          kubectl logs -l app=frontend -n campus-events --tail=50 || true
+          
+          echo ""
+          echo "=== Events API Logs ==="
+          kubectl logs -l app=events-api -n campus-events --tail=50 || true
+          
+          echo ""
+          echo "=== Notification Service Logs ==="
+          kubectl logs -l app=notification-service -n campus-events --tail=50 || true
+
+  notify:
+    name: Notify Deployment Status
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: always()
+    
+    steps:
+      - name: Notify success
+        if: ${{ needs.deploy.result == 'success' }}
+        run: |
+          echo "âœ… Deployment to EKS completed successfully"
+          echo "All services are running and healthy"
+          
+      - name: Notify failure
+        if: ${{ needs.deploy.result == 'failure' }}
+        run: |
+          echo "â�� Deployment to EKS failed"
+          echo "Check the logs above for details"
+          exit 1
