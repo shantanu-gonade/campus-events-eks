@@ -2,7 +2,9 @@ import { useState, useEffect } from 'react'
 import axios from 'axios'
 import './App.css'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
+// Use relative path so it works through the ALB
+// When accessed via ALB, /api routes to the backend service
+const API_URL = import.meta.env.VITE_API_URL || ''
 
 function App() {
   const [events, setEvents] = useState([])
@@ -56,10 +58,15 @@ function App() {
               {events.map((event) => (
                 <div key={event.id} className="event-card">
                   <h3>{event.title}</h3>
-                  <p className="event-date">{new Date(event.date).toLocaleDateString()}</p>
+                  <p className="event-date">
+                    📅 {new Date(event.start_time).toLocaleString()}
+                  </p>
                   <p className="event-description">{event.description}</p>
                   <p className="event-location">📍 {event.location}</p>
-                  <p className="event-capacity">👥 {event.capacity} attendees</p>
+                  <p className="event-capacity">
+                    👥 {event.current_attendees}/{event.max_attendees} attendees
+                  </p>
+                  <p className="event-category">🏷️ {event.category}</p>
                 </div>
               ))}
             </div>
