@@ -45,27 +45,28 @@ export const getEventById = async (req, res, next) => {
 
 export const createEvent = async (req, res, next) => {
   try {
-    const { title, description, startDateTime, endDateTime, location, capacity } = req.body
+    const { title, description, start_time, end_time, location, max_attendees, category } = req.body
     
-    // Get the admin user ID for organizer (temporary - should come from auth)
-    const adminUser = await pool.query(
-      `SELECT id FROM users WHERE role = 'admin' LIMIT 1`
+    // Get the demo organizer (MVP - no auth yet)
+    const organizer = await pool.query(
+      `SELECT id FROM users WHERE role IN ('organizer', 'admin') ORDER BY created_at LIMIT 1`
     )
     
-    if (adminUser.rows.length === 0) {
-      return res.status(500).json({ error: 'System configuration error' })
+    if (organizer.rows.length === 0) {
+      return res.status(500).json({ error: 'No organizer found. Please run database setup.' })
     }
     
     const result = await pool.query(
       `INSERT INTO events (title, description, start_time, end_time, location, max_attendees, organizer_id, category) 
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
        RETURNING *`,
-      [title, description, startDateTime, endDateTime, location, capacity, adminUser.rows[0].id, 'Other']
+      [title, description, start_time, end_time, location, max_attendees, organizer.rows[0].id, category || 'Other']
     )
     
     logger.info('Event created:', result.rows[0].id)
     res.status(201).json(result.rows[0])
   } catch (error) {
+    logger.error('Error creating event:', error)
     next(error)
   }
 }
