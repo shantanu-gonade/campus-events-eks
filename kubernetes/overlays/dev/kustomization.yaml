@@ -1,0 +1,20 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: campus-events
+
+bases:
+  - ../../base
+
+namePrefix: dev-
+
+commonLabels:
+  environment: dev
+
+images:
+  - name: 842819994894.dkr.ecr.us-east-1.amazonaws.com/campus-events/frontend
+    newTag: latest
+  - name: 842819994894.dkr.ecr.us-east-1.amazonaws.com/campus-events/events-api
+    newTag: latest
+  - name: 842819994894.dkr.ecr.us-east-1.amazonaws.com/campus-events/notification-service
+    newTag: latest

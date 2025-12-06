@@ -7,7 +7,7 @@ WORKDIR /app
 
 # Install dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir --user -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 # =============================================================================
 # Stage 2: Production
@@ -25,17 +25,15 @@ RUN useradd -m -u 1001 -s /bin/bash appuser
 
 WORKDIR /app
 
-# Copy dependencies from deps stage
-COPY --from=deps --chown=appuser:appuser /root/.local /home/appuser/.local
+# Copy dependencies from deps stage (installed system-wide in /usr/local)
+COPY --from=deps /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
+COPY --from=deps /usr/local/bin /usr/local/bin
 
 # Copy application code
 COPY --chown=appuser:appuser . .
 
 # Switch to non-root user
 USER appuser
-
-# Update PATH
-ENV PATH=/home/appuser/.local/bin:$PATH
 
 # Expose port
 EXPOSE 8082
