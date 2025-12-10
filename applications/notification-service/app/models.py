@@ -5,7 +5,7 @@ from datetime import datetime
 class NotificationRequest(BaseModel):
     recipient: EmailStr
     subject: str
-    template: str
+    template: Optional[str] = None  # Make template optional
     context: Dict[str, Any]
     
 class NotificationResponse(BaseModel):

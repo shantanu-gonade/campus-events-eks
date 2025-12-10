@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Event Reminder ⏰</h2>
+
+<p>Hi {{ attendee_name or 'there' }},</p>
+
+<p>This is a friendly reminder that the following event is starting in 24 hours:</p>
+
+<div class="info-box">
+    <h3>{{ event_title }}</h3>
+    <p><strong>📅 Date:</strong> {{ event_date }}</p>
+    <p><strong>🕐 Time:</strong> {{ event_time }}</p>
+    <p><strong>📍 Location:</strong> {{ event_location }}</p>
+</div>
+
+{% if event_notes %}
+<p><strong>Important Notes:</strong></p>
+<p>{{ event_notes }}</p>
+{% endif %}
+
+{% if event_url %}
+<a href="{{ event_url }}" class="button">View Event Details</a>
+{% endif %}
+
+<p>See you soon!</p>
+
+<p>Best regards,<br>Campus Events Team</p>
+{% endblock %}

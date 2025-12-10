@@ -91,7 +91,6 @@ async def health_check():
 @app.get("/ready", response_model=HealthCheck)
 async def readiness_check():
     """Readiness check endpoint"""
-    # Could add checks for AWS services connectivity here
     return HealthCheck(
         status="ready",
         timestamp=datetime.utcnow()
@@ -99,16 +98,53 @@ async def readiness_check():
 
 @app.post("/api/v1/notifications/email", response_model=NotificationResponse, status_code=status.HTTP_201_CREATED)
 async def send_email_notification(notification: NotificationRequest):
-    """Send email notification"""
+    """
+    Send email notification
+    
+    Supports both template-based and custom HTML emails:
+    - If 'template' is provided in context, uses Jinja2 template
+    - Otherwise, generates simple HTML from context['message']
+    
+    Available templates:
+    - event_created
+    - rsvp_confirmed
+    - event_reminder
+    - event_cancelled
+    """
     try:
-        # Simple template rendering (in production, use Jinja2)
-        body_html = f"<h2>{notification.subject}</h2><p>{notification.context.get('message', '')}</p>"
+        # Check if template is specified (either in notification.template or context)
+        template = notification.template or notification.context.get('template')
         
-        result = await email_service.send_email(
-            recipient=notification.recipient,
-            subject=notification.subject,
-            body_html=body_html
-        )
+        if template:
+            # Use template with context
+            result = await email_service.send_email(
+                recipient=notification.recipient,
+                subject=notification.subject,
+                template=template,
+                context=notification.context
+            )
+        else:
+            # Generate simple HTML from message
+            message = notification.context.get('message', '')
+            body_html = f"""
+            <html>
+                <body style="font-family: Arial, sans-serif; padding: 20px;">
+                    <h2>{notification.subject}</h2>
+                    <p>{message}</p>
+                    <hr>
+                    <p style="color: #666; font-size: 12px;">
+                        Campus Events Notification System
+                    </p>
+                </body>
+            </html>
+            """
+            
+            result = await email_service.send_email(
+                recipient=notification.recipient,
+                subject=notification.subject,
+                body_html=body_html,
+                body_text=message
+            )
         
         notifications_sent_total.labels(type='email', status='success').inc()
         
@@ -128,14 +164,29 @@ async def send_email_notification(notification: NotificationRequest):
 
 @app.post("/api/v1/notifications/sms", response_model=NotificationResponse, status_code=status.HTTP_201_CREATED)
 async def send_sms_notification(notification: NotificationRequest):
-    """Send SMS notification via SNS"""
+    """
+    Send SMS notification via SNS
+    
+    Can send to:
+    - SNS topic (if recipient is not a phone number)
+    - Direct phone number (if recipient starts with +)
+    """
     try:
         message = notification.context.get('message', '')
         
-        result = await sns_service.publish_message(
-            message=message,
-            subject=notification.subject
-        )
+        # Check if recipient is a phone number
+        if notification.recipient.startswith('+'):
+            result = await sns_service.publish_message(
+                message=message,
+                subject=notification.subject,
+                phone_number=notification.recipient
+            )
+        else:
+            # Publish to SNS topic
+            result = await sns_service.publish_message(
+                message=message,
+                subject=notification.subject
+            )
         
         notifications_sent_total.labels(type='sms', status='success').inc()
         
@@ -152,6 +203,21 @@ async def send_sms_notification(notification: NotificationRequest):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to send notification: {str(e)}"
         )
+
+@app.get("/")
+async def root():
+    """Root endpoint"""
+    return {
+        "service": "Campus Events Notification Service",
+        "version": "1.0.0",
+        "status": "running",
+        "endpoints": {
+            "health": "/health",
+            "metrics": "/metrics",
+            "email": "/api/v1/notifications/email",
+            "sms": "/api/v1/notifications/sms"
+        }
+    }
 
 if __name__ == "__main__":
     import uvicorn
