@@ -17,9 +17,26 @@ export const eventSchema = Joi.object({
   max_attendees: Joi.number().integer().min(1).max(1000).required()
 })
 
+export const eventUpdateSchema = Joi.object({
+  title: Joi.string().min(3).max(200).optional().trim(),
+  description: Joi.string().max(2000).optional().trim(),
+  start_time: Joi.date().iso().min(oneHourAgo).optional().messages({
+    'date.min': 'Start time must not be more than 1 hour in the past'
+  }),
+  end_time: Joi.date().iso().greater(Joi.ref('start_time')).optional().messages({
+    'date.greater': 'End time must be after start time'
+  }),
+  location: Joi.string().max(200).optional().trim(),
+  category: Joi.string().valid('Workshop', 'Seminar', 'Social', 'Sports', 'Cultural', 'Career', 'Hackathon', 'Conference', 'Club Meeting', 'Other').optional(),
+  status: Joi.string().valid('upcoming', 'ongoing', 'completed', 'cancelled').optional(),
+  max_attendees: Joi.number().integer().min(1).max(1000).optional()
+}).min(1) // At least one field must be provided
+
 export const rsvpSchema = Joi.object({
   name: Joi.string().min(2).max(100).required().trim(),
-  email: Joi.string().email().required().trim().lowercase()
+  email: Joi.string().email().required().trim().lowercase(),
+  phone: Joi.string().optional().trim().allow(''),
+  notes: Joi.string().max(500).optional().trim().allow('')
 })
 
 export const validate = (schema) => {

@@ -12,6 +12,9 @@ export const EVENT_CATEGORIES = [
   'Other',
 ];
 
+// Alias for easier import
+export const CATEGORIES = EVENT_CATEGORIES;
+
 // Category colors for chips/badges
 export const CATEGORY_COLORS = {
   Workshop: '#9c27b0',
