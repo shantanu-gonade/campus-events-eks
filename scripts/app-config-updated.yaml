@@ -7,15 +7,15 @@ metadata:
     app: campus-events
     component: config
 data:
-  NODE_ENV: "production"
-  LOG_LEVEL: "info"
-  API_BASE_URL: "http://events-api-service:8080"
-  NOTIFICATIONS_BASE_URL: "http://notification-service:8082"
-  CORS_ORIGIN: "*"
-  RATE_LIMIT_WINDOW: "900000"
+  API_BASE_URL: http://dev-events-api-service:8080
+  AWS_REGION: us-east-1
+  CORS_ORIGIN: '*'
+  LOG_LEVEL: info
+  NODE_ENV: production
+  NOTIFICATION_SERVICE_URL: http://dev-notification-service:8082
+  NOTIFICATIONS_BASE_URL: http://dev-notification-service:8082
   RATE_LIMIT_MAX: "100"
-  AWS_REGION: "us-east-1"
-  # Notification Service Configuration
+  RATE_LIMIT_WINDOW: "900000"
   SES_SENDER_EMAIL: shangonade@gmail.com
   SNS_TOPIC_ARN: arn:aws:sns:us-east-1:842819994894:campus-events-dev-notifications
   SQS_QUEUE_URL: https://sqs.us-east-1.amazonaws.com/842819994894/campus-events-dev-notifications-queue

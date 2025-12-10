@@ -48,7 +48,16 @@ spec:
                 port:
                   number: 8080
           
-          # Events API - Most specific first
+          # Socket.IO for WebSocket connections (handled by events-api)
+          - path: /socket.io
+            pathType: Prefix
+            backend:
+              service:
+                name: dev-events-api-service
+                port:
+                  number: 8080
+          
+          # Events API with /api prefix - Most specific first
           - path: /api/v1/events
             pathType: Prefix
             backend:
@@ -57,7 +66,7 @@ spec:
                 port:
                   number: 8080
           
-          # Analytics API
+          # Analytics API with /api prefix
           - path: /api/v1/analytics
             pathType: Prefix
             backend:
@@ -66,8 +75,35 @@ spec:
                 port:
                   number: 8080
           
-          # Recommendations API
+          # Recommendations API with /api prefix
           - path: /api/v1/recommendations
+            pathType: Prefix
+            backend:
+              service:
+                name: dev-events-api-service
+                port:
+                  number: 8080
+          
+          # Events API without /api prefix (for frontend direct calls)
+          - path: /v1/events
+            pathType: Prefix
+            backend:
+              service:
+                name: dev-events-api-service
+                port:
+                  number: 8080
+          
+          # Analytics API without /api prefix (for frontend direct calls)
+          - path: /v1/analytics
+            pathType: Prefix
+            backend:
+              service:
+                name: dev-events-api-service
+                port:
+                  number: 8080
+          
+          # Recommendations API without /api prefix (for frontend direct calls)
+          - path: /v1/recommendations
             pathType: Prefix
             backend:
               service:

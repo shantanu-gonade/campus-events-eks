@@ -24,6 +24,7 @@ spec:
         component: notification
         tier: backend
     spec:
+      serviceAccountName: notification-service
       containers:
       - name: notification-service
         image: 842819994894.dkr.ecr.us-east-1.amazonaws.com/campus-events/notification-service:latest
@@ -43,41 +44,21 @@ spec:
             configMapKeyRef:
               name: app-config
               key: AWS_REGION
-        - name: AWS_ACCESS_KEY_ID
-          valueFrom:
-            secretKeyRef:
-              name: aws-credentials
-              key: AWS_ACCESS_KEY_ID
-        - name: AWS_SECRET_ACCESS_KEY
-          valueFrom:
-            secretKeyRef:
-              name: aws-credentials
-              key: AWS_SECRET_ACCESS_KEY
-        - name: DB_HOST
+        - name: SES_SENDER_EMAIL
           valueFrom:
             configMapKeyRef:
-              name: database-config
-              key: DB_HOST
-        - name: DB_PORT
+              name: app-config
+              key: SES_SENDER_EMAIL
+        - name: SNS_TOPIC_ARN
           valueFrom:
             configMapKeyRef:
-              name: database-config
-              key: DB_PORT
-        - name: DB_NAME
+              name: app-config
+              key: SNS_TOPIC_ARN
+        - name: SQS_QUEUE_URL
           valueFrom:
             configMapKeyRef:
-              name: database-config
-              key: DB_NAME
-        - name: DB_USERNAME
-          valueFrom:
-            secretKeyRef:
-              name: database-secret
-              key: DB_USERNAME
-        - name: DB_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: database-secret
-              key: DB_PASSWORD
+              name: app-config
+              key: SQS_QUEUE_URL
         resources:
           requests:
             memory: "256Mi"

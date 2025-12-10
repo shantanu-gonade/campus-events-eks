@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Event Created Successfully! 🎉</h2>
+
+<p>Hi {{ organizer_name or 'there' }},</p>
+
+<p>Your event has been successfully created and is now live on Campus Events!</p>
+
+<div class="info-box">
+    <h3>{{ event_title }}</h3>
+    <p><strong>📅 Date:</strong> {{ event_date }}</p>
+    <p><strong>🕐 Time:</strong> {{ event_time }}</p>
+    <p><strong>📍 Location:</strong> {{ event_location }}</p>
+    {% if event_capacity %}
+    <p><strong>👥 Capacity:</strong> {{ event_capacity }} attendees</p>
+    {% endif %}
+</div>
+
+<p>{{ event_description }}</p>
+
+{% if event_url %}
+<a href="{{ event_url }}" class="button">View Event Details</a>
+{% endif %}
+
+<p>Your event is now visible to all students. We'll notify you when someone RSVPs!</p>
+
+<p>Best regards,<br>Campus Events Team</p>
+{% endblock %}
