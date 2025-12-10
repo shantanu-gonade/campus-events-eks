@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>RSVP Confirmed! ✅</h2>
+
+<p>Hi {{ attendee_name or 'there' }},</p>
+
+<p>Your RSVP has been confirmed for the following event:</p>
+
+<div class="info-box">
+    <h3>{{ event_title }}</h3>
+    <p><strong>📅 Date:</strong> {{ event_date }}</p>
+    <p><strong>🕐 Time:</strong> {{ event_time }}</p>
+    <p><strong>📍 Location:</strong> {{ event_location }}</p>
+</div>
+
+{% if event_description %}
+<p><strong>About this event:</strong></p>
+<p>{{ event_description }}</p>
+{% endif %}
+
+{% if event_url %}
+<a href="{{ event_url }}" class="button">View Event Details</a>
+{% endif %}
+
+<p>We'll send you a reminder 24 hours before the event starts.</p>
+
+<p>Looking forward to seeing you there!</p>
+
+<p>Best regards,<br>Campus Events Team</p>
+{% endblock %}

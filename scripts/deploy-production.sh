@@ -24,7 +24,7 @@ AWS_REGION="us-east-1"
 AWS_ACCOUNT_ID="842819994894"
 ECR_REGISTRY="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
 PROJECT_NAME="campus-events"
-VERSION="v2.1"
+VERSION="v3.1"
 
 # Image names
 FRONTEND_IMAGE="${ECR_REGISTRY}/${PROJECT_NAME}/frontend:${VERSION}"

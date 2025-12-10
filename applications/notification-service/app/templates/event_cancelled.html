@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Event Cancelled ❌</h2>
+
+<p>Hi {{ attendee_name or 'there' }},</p>
+
+<p>We regret to inform you that the following event has been cancelled:</p>
+
+<div class="info-box">
+    <h3>{{ event_title }}</h3>
+    <p><strong>📅 Was scheduled for:</strong> {{ event_date }} at {{ event_time }}</p>
+    <p><strong>📍 Location:</strong> {{ event_location }}</p>
+</div>
+
+{% if cancellation_reason %}
+<p><strong>Reason for cancellation:</strong></p>
+<p>{{ cancellation_reason }}</p>
+{% endif %}
+
+<p>We apologize for any inconvenience this may cause.</p>
+
+{% if events_url %}
+<a href="{{ events_url }}" class="button">Browse Other Events</a>
+{% endif %}
+
+<p>Best regards,<br>Campus Events Team</p>
+{% endblock %}

@@ -1,6 +1,7 @@
 import pool from '../config/database.js'
 import logger from '../utils/logger.js'
 import { io } from '../app.js'
+import { sendRSVPConfirmation } from '../services/notificationService.js'
 
 export const getAllEvents = async (req, res, next) => {
   try {
@@ -310,6 +311,21 @@ export const createRSVP = async (req, res, next) => {
     )
     
     logger.info('RSVP created:', result.rows[0].id)
+    
+    // Get full event details for email
+    const eventDetails = await pool.query(
+      'SELECT * FROM events WHERE id = $1',
+      [eventId]
+    )
+    
+    // Send confirmation email (non-blocking)
+    sendRSVPConfirmation(email, name, eventDetails.rows[0])
+      .then(() => {
+        logger.info(`RSVP confirmation email sent to ${email}`)
+      })
+      .catch(err => {
+        logger.error(`Failed to send RSVP confirmation email to ${email}:`, err)
+      })
     
     // Emit WebSocket event
     io.emit('rsvp:created', {
