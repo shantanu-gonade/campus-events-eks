@@ -463,7 +463,7 @@ curl http://<alb-url>/api/v1/analytics/statistics
 |-----------|---------------|
 | **Terraform** | [Infrastructure as Code](terraform/README.md) |
 | **Kubernetes** | [K8s Manifests](kubernetes/README.md) |
-| **CI/CD** | [GitHub Actions](.github/README.md) |
+| **CI/CD** | [GitHub Actions](.github/workflows/README.md) |
 | **Frontend** | [React Application](applications/frontend/README.md) |
 | **Events API** | [Node.js Backend](applications/events-api/README.md) |
 | **Notifications** | [Python Service](applications/notification-service/README.md) |
